@@ -26,9 +26,9 @@ function getInitials(name?: string | null, email?: string | null) {
 }
 export async function Header() {
   const user = await getCurrentUser();
-  
+
   return (
-    <header className="sticky top-0 z-50 w-full border-b  bg-linear-to-r from-[#ebf8f2] to-gray-50 backdrop-blur-md">
+    <header className="sticky top-0 z-50 w-full border-b  bg-white backdrop-blur-md">
       <div className="container mx-auto flex h-16 items-center justify-between px-6">
         <Link href="/" className="text-3xl font-semibold tracking-tight">
           ARCHETICT
