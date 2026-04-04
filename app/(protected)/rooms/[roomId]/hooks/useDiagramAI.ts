@@ -1,12 +1,41 @@
 import { useState, useCallback } from "react";
 import { Editor, createShapeId, toRichText, TLShapeId } from "tldraw";
 
-type ActionState = "idle" | "explaining" | "completing" | "generating";
-
+export type ActionState = "idle" | "explaining" | "completing" | "generating";
+export interface AlertState {
+  title?: string;
+  message: string;
+  variant: "default" | "destructive" | "success" | "info";
+  layout?: "default" | "fixed" | "sticky" | "fixed-bottom";
+}
+export interface DiagramData {
+  shapes: Array<{
+    id: string;
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    geo: string | any;
+    text: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    color: string | any;
+  }>;
+  arrows: Array<{
+    fromId: TLShapeId;
+    toId: TLShapeId;
+  }>;
+}
 export function useDiagramAI(editor: Editor | null) {
   const [actionState, setActionState] = useState<ActionState>("idle");
   const [explanation, setExplanation] = useState<string | null>(null);
-
+  const [alertState, setAlertState] = useState<AlertState | null>(null);
+  const triggerAlert = useCallback((alertProps: AlertState) => {
+    setAlertState(alertProps);
+    setTimeout(() => {
+      setAlertState(null);
+    }, 4000);
+  }, []);
   const getCanvasContext = useCallback(async () => {
     if (!editor) return null;
     const shapeIds = Array.from(editor.getCurrentPageShapeIds());
@@ -18,24 +47,39 @@ export function useDiagramAI(editor: Editor | null) {
       padding: 32,
     });
     const base64Image = exportResult.url;
-    const existingShapes = shapeIds.map((id) => {
-      const shape = editor.getShape(id);
-      return {
-        id: shape!.id,
-        type: shape!.type,
-        x: shape!.x,
-        y: shape!.y,
-        // @ts-expect-error anc
-        text: shape!.props?.text || shape!.props?.richText?.text || "",
-      };
-    });
+
+    const existingShapes = shapeIds
+      .map((id) => {
+        const shape = editor.getShape(id);
+        if (!shape) return null;
+        const props =
+          "props" in shape
+            ? (shape.props as { text?: string; richText?: { text: string } })
+            : {};
+        const text = props.text ?? props.richText?.text ?? "";
+        return {
+          id: shape!.id,
+          type: shape!.type,
+          x: shape!.x,
+          y: shape!.y,
+          text,
+        };
+      })
+      .filter(Boolean);
 
     return { base64Image, existingShapes };
   }, [editor]);
 
   const explainDiagram = async () => {
     const context = await getCanvasContext();
-    if (!context) return alert("Canvas is empty!");
+    if (!context) {
+      triggerAlert({
+        message: "Canvas is empty!",
+        variant: "info",
+        layout: "fixed",
+      });
+      return;
+    }
 
     setActionState("explaining");
     try {
@@ -51,8 +95,13 @@ export function useDiagramAI(editor: Editor | null) {
       if (!res.ok) throw new Error(data.error);
       setExplanation(data.explanation);
     } catch (error) {
-      console.error(error);
-      alert("Failed to analyze diagram.");
+      console.error("Failed to analyze diagram.", error);
+      triggerAlert({
+        title: "Error",
+        message: "Failed to analyze diagram.",
+        variant: "destructive",
+        layout: "fixed",
+      });
     } finally {
       setActionState("idle");
     }
@@ -60,7 +109,14 @@ export function useDiagramAI(editor: Editor | null) {
 
   const autocompleteDiagram = async () => {
     const context = await getCanvasContext();
-    if (!context || !editor) return;
+    if (!context || !editor) {
+      triggerAlert({
+        message: "Canvas is empty!",
+        variant: "info",
+        layout: "fixed",
+      });
+      return;
+    }
 
     setActionState("completing");
     try {
@@ -76,9 +132,20 @@ export function useDiagramAI(editor: Editor | null) {
       if (!res.ok) throw new Error(data.error);
 
       await renderDiagramData(data, editor, null);
+      triggerAlert({
+        title: "Success",
+        message: "Diagram auto-completed successfully.",
+        variant: "success",
+        layout: "fixed",
+      });
     } catch (err) {
-      alert("Failed to autocomplete");
-      console.error("error in autocomplete", err);
+      console.error("Failed to auto complete diagram", err);
+      triggerAlert({
+        title: "Error",
+        message: "Failed to autocomplete diagram.",
+        variant: "destructive",
+        layout: "fixed",
+      });
     } finally {
       setActionState("idle");
     }
@@ -96,16 +163,27 @@ export function useDiagramAI(editor: Editor | null) {
       });
       const data = await res.json();
       await renderDiagramData(data, editor, center);
+      triggerAlert({
+        title: "Success",
+        message: "Diagram generated successfully",
+        variant: "success",
+        layout: "fixed",
+      });
     } catch (err) {
-      alert("Generation failed");
+      console.error("Error Generating Diagram from prompt", err);
+      triggerAlert({
+        title: "Error",
+        message: "Failed to Generate Diagram.",
+        variant: "destructive",
+        layout: "fixed",
+      });
     } finally {
       setActionState("idle");
     }
   };
 
   async function renderDiagramData(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    data: any,
+    data: DiagramData,
     ed: Editor,
     center: { x: number; y: number } | null,
   ) {
@@ -116,6 +194,7 @@ export function useDiagramAI(editor: Editor | null) {
       const newId = createShapeId();
       idMap.set(s.id, newId);
       toSelect.push(newId);
+
       ed.createShape({
         id: newId,
         type: "geo",
@@ -173,5 +252,7 @@ export function useDiagramAI(editor: Editor | null) {
     explainDiagram,
     autocompleteDiagram,
     generateFromPrompt,
+    alertState,
+    setAlertState,
   };
 }
