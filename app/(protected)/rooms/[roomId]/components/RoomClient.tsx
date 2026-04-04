@@ -2,15 +2,11 @@
 
 import { useYjsStore } from "@/hooks/useYjsStore";
 import "tldraw/tldraw.css";
-import {
-  createShapeId,
-  Editor,
-  Tldraw,
-  TLUiToolsContextType,
-  toRichText,
-} from "tldraw";
+import { Editor, Tldraw, TLUiToolsContextType } from "tldraw";
 import { useCallback, useState } from "react";
 import { RoomHeader } from "./RoomHeader";
+import ReactMarkdown from "react-markdown";
+import { useDiagramAI } from "../hooks/useDiagramAI";
 
 const uiOverrides = {
   tools: (_editor: Editor, tools: TLUiToolsContextType) => {
@@ -19,6 +15,28 @@ const uiOverrides = {
   },
 };
 
+const Spinner = ({ className = "w-5 h-5" }: { className?: string }) => (
+  <svg
+    className={`animate-spin ${className}`}
+    xmlns="http://www.w3.org/2000/svg"
+    fill="none"
+    viewBox="0 0 24 24"
+  >
+    <circle
+      className="opacity-25"
+      cx="12"
+      cy="12"
+      r="10"
+      stroke="currentColor"
+      strokeWidth="4"
+    ></circle>
+    <path
+      className="opacity-75"
+      fill="currentColor"
+      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+    ></path>
+  </svg>
+);
 export default function RoomClient({
   roomId,
   roomName,
@@ -29,11 +47,22 @@ export default function RoomClient({
   user: { id: string; name: string; color: string };
 }) {
   const [editor, setEditor] = useState<Editor | null>(null);
+  const [prompt, setPrompt] = useState("");
+  const {
+    actionState,
+    explanation,
+    setExplanation,
+    explainDiagram,
+    autocompleteDiagram,
+    generateFromPrompt,
+  } = useDiagramAI(editor);
+
   const { storeWithStatus, activeUsers } = useYjsStore({
     roomId,
     hostUrl: process.env.NEXT_PUBLIC_YJS_URL || "",
     user,
   });
+
   const handleMount = useCallback(
     (mountedEditor: Editor) => {
       mountedEditor.user.updateUserPreferences({
@@ -41,137 +70,30 @@ export default function RoomClient({
         name: user.name,
         color: user.color,
       });
-
-      // 1. Disable dropping/pasting new files onto the canvas
-      mountedEditor.registerExternalContentHandler("files", () => {
-        // By returning nothing, we prevent the default shape creation
-        console.log("Inserting File is Not Allowed.");
-      });
-
-      // 2. Disable dropping files on top of existing shapes (file replacement)
-      mountedEditor.registerExternalContentHandler("file-replace", () => {
-        console.log("File replacement is Not Allowed.");
-      });
-
-      // 3. Disable dragging/pasting URLs or raw SVG text
-      mountedEditor.registerExternalContentHandler("url", () => {
-        console.log("Inserting URL is Not Allowed.");
-      });
-      mountedEditor.registerExternalContentHandler("svg-text", () => {
-        console.log("Inserting SVG is Not Allowed.");
-      });
-
+      mountedEditor.registerExternalContentHandler("files", () => {});
+      mountedEditor.registerExternalContentHandler("file-replace", () => {});
+      mountedEditor.registerExternalContentHandler("url", () => {});
+      mountedEditor.registerExternalContentHandler("svg-text", () => {});
       setEditor(mountedEditor);
     },
-    [user.id, user.name, user.color],
+    [user],
   );
-  const handleMockAiResponse = async () => {
-    if (!editor) return;
-
-    // Get the center of the current viewport so the AI draws right in front of the user
-    const center = editor.getViewportPageBounds().center;
-
-    // 1. Loading/Thinking State (Canvas as Output)
-    const textId = createShapeId();
-    editor.createShape({
-      id: textId,
-      type: "text",
-      x: center.x - 120,
-      y: center.y - 150,
-      props: {
-        richText: toRichText(" AI is thinking..."),
-        color: "violet",
-        size: "m",
-      },
-    });
-
-    // Simulate network latency / LLM processing time
-    await new Promise((res) => setTimeout(res, 1200));
-
-    editor.updateShape({
-      id: textId,
-      type: "text",
-      props: { richText: toRichText(" AI: Here is your visual workflow:") },
-    });
-
-    // 2. Simulate AI drawing shapes sequentially (AI Agent Pattern)
-    await new Promise((res) => setTimeout(res, 600));
-    const box1Id = createShapeId();
-    editor.createShape({
-      id: box1Id,
-      type: "geo",
-      x: center.x - 200,
-      y: center.y - 60,
-      props: {
-        geo: "rectangle",
-        w: 150,
-        h: 60,
-        richText: toRichText("User Input"),
-        color: "blue",
-        fill: "semi",
-      },
-    });
-
-    await new Promise((res) => setTimeout(res, 600));
-    const box2Id = createShapeId();
-    editor.createShape({
-      id: box2Id,
-      type: "geo",
-      x: center.x + 50,
-      y: center.y - 60,
-      props: {
-        geo: "diamond",
-        w: 150,
-        h: 100,
-        richText: toRichText("LLM Node"),
-        color: "light-violet",
-        fill: "solid",
-      },
-    });
-
-    await new Promise((res) => setTimeout(res, 600));
-    const arrowId = createShapeId();
-    editor.createShape({
-      id: arrowId,
-      type: "arrow",
-      props: { color: "black", dash: "draw" },
-    });
-
-    // 3. Bind the arrows perfectly to the shapes so they stay connected if the user moves them
-    editor.createBinding({
-      type: "arrow",
-      fromId: arrowId,
-      toId: box1Id,
-      props: {
-        terminal: "start",
-        normalizedAnchor: { x: 0.5, y: 0.5 },
-        isExact: false,
-      },
-    });
-
-    editor.createBinding({
-      type: "arrow",
-      fromId: arrowId,
-      toId: box2Id,
-      props: {
-        terminal: "end",
-        normalizedAnchor: { x: 0.5, y: 0.5 },
-        isExact: false,
-      },
-    });
-
-    // 4. Focus the camera on the newly generated content
-    editor.select(box1Id, box2Id, arrowId);
-    editor.zoomToSelection({ animation: { duration: 500 } });
-    editor.selectNone();
+  const handleAiResponse = async (e: React.SubmitEvent) => {
+    e.preventDefault();
+    generateFromPrompt(prompt);
   };
+  const isBusy = actionState !== "idle";
   if (storeWithStatus.status === "loading") {
     return (
-      <div className="flex h-screen items-center justify-center">
-        Loading Room...
+      <div className="flex h-screen flex-col items-center justify-center gap-4 bg-[#F8F9FA]">
+        <Spinner className="w-10 h-10 text-indigo-600" />
+        <p className="text-gray-600 font-medium animate-pulse">
+          Loading Room...
+        </p>
       </div>
     );
   }
+
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-[#F8F9FA]">
       <RoomHeader
@@ -189,13 +111,80 @@ export default function RoomClient({
           overrides={uiOverrides}
         />
       </div>
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10">
-        <button
-          onClick={handleMockAiResponse}
-          disabled={!editor}
-          className="flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white rounded-full shadow-xl transition-transform hover:scale-105 active:scale-95 font-medium"
+
+      {explanation && (
+        <div className="absolute top-24 right-8 w-96 bg-white p-6 rounded-xl shadow-2xl border border-gray-100 z-20 max-h-[70vh] overflow-y-auto">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="font-bold text-lg text-indigo-600">AI Analysis</h3>
+            <button
+              onClick={() => setExplanation(null)}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="prose prose-sm text-gray-700 whitespace-pre-wrap">
+            <ReactMarkdown>{explanation}</ReactMarkdown>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Toolbar */}
+      <div className="absolute bottom-28 left-1/2 -translate-x-1/2 z-10 w-full max-w-md">
+        <form
+          onSubmit={handleAiResponse}
+          className="flex items-center gap-2 bg-white p-2 rounded-full shadow-2xl border border-gray-200"
         >
-          <span> Simulate AI Diagram</span>
+          <input
+            type="text"
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            placeholder="e.g., Draw an AWS microservice architecture..."
+            className="flex-1 px-4 py-2 outline-none rounded-full bg-transparent text-gray-800 placeholder-gray-400"
+            disabled={!editor || isBusy}
+          />
+          <button
+            type="submit"
+            disabled={!editor || isBusy || !prompt.trim()}
+            className="flex items-center gap-2 px-6 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white rounded-full transition-transform hover:scale-105 active:scale-95 font-medium"
+          >
+            {actionState === "generating" ? (
+              <>
+                <Spinner /> Drawing
+              </>
+            ) : (
+              "Generate"
+            )}
+          </button>
+        </form>
+      </div>
+      <div className="absolute bottom-12 left-1/2 -translate-x-1/2 z-10 flex gap-4 bg-white p-2 rounded-full shadow-2xl border border-gray-200">
+        <button
+          onClick={explainDiagram}
+          disabled={!editor || isBusy}
+          className="px-6 py-2 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-800 rounded-full transition-transform active:scale-95 font-medium"
+        >
+          {actionState === "explaining" ? (
+            <>
+              <Spinner className="text-slate-500 w-5 h-5" /> Analyzing...
+            </>
+          ) : (
+            "🧐 Explain Diagram"
+          )}
+        </button>
+
+        <button
+          onClick={autocompleteDiagram}
+          disabled={!editor || isBusy}
+          className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-full transition-transform active:scale-95 font-medium shadow-md shadow-indigo-200"
+        >
+          {actionState === "completing" ? (
+            <>
+              <Spinner /> Completing...
+            </>
+          ) : (
+            "✨ Auto-Complete"
+          )}
         </button>
       </div>
     </div>
