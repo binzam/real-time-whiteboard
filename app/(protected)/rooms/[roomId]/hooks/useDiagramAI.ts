@@ -75,7 +75,7 @@ export function useDiagramAI(editor: Editor | null) {
     if (!context) {
       triggerAlert({
         message: "Canvas is empty!",
-        variant: "info",
+        variant: "destructive",
         layout: "fixed",
       });
       return;
@@ -112,7 +112,7 @@ export function useDiagramAI(editor: Editor | null) {
     if (!context || !editor) {
       triggerAlert({
         message: "Canvas is empty!",
-        variant: "info",
+        variant: "destructive",
         layout: "fixed",
       });
       return;
