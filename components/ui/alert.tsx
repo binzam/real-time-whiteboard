@@ -11,14 +11,14 @@ const alertVariants = cva(
       variant: {
         default: "bg-card text-card-foreground",
         destructive:
-          "border-destructive/50 bg-destructive/10 text-destructive *:data-[slot=alert-description]:text-destructive/90 *:[svg]:text-current",
+          "border-destructive/50 bg-destructive/90 text-white *:data-[slot=alert-description]:text-white *:[svg]:text-current",
         success:
           "border-green-500/50 bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-400 *:data-[slot=alert-description]:text-green-700/90 *:[svg]:text-current",
         info: "border-blue-500/50 bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400 *:data-[slot=alert-description]:text-blue-700/90 *:[svg]:text-current",
       },
       layout: {
         default: "",
-        fixed: "fixed top-6 left-1/2 -translate-x-1/2 z-[100] max-w-md w-full",
+        fixed: "fixed top-16 left-1/2 -translate-x-1/2 z-[100] max-w-md w-full",
         "fixed-bottom":
           "fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] max-w-md w-full",
         sticky: "sticky top-4 z-50 mb-4 mx-auto max-w-md w-full",
