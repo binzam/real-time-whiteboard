@@ -3,9 +3,8 @@ import { NextResponse } from "next/server";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY as string);
 
-interface AnalyzeRequest {
+interface CompleteDiagramRequest {
   image: string;
-  action: "explain" | "autocomplete";
   existingShapes: Array<{
     id: string;
     type: string;
@@ -17,16 +16,15 @@ interface AnalyzeRequest {
 
 export async function POST(req: Request) {
   try {
-    const body: AnalyzeRequest = await req.json();
-    const { image, action, existingShapes } = body;
+    const body: CompleteDiagramRequest = await req.json();
+    const { image, existingShapes } = body;
 
     const base64Data = image.replace(/^data:image\/(png|jpeg);base64,/, "");
 
     const model = genAI.getGenerativeModel({
       model: "gemini-2.5-flash",
       generationConfig: {
-        responseMimeType:
-          action === "autocomplete" ? "application/json" : "text/plain",
+        responseMimeType: "application/json",
       },
     });
 
@@ -37,17 +35,7 @@ export async function POST(req: Request) {
       },
     };
 
-    let systemPrompt = "";
-
-    if (action === "explain") {
-      systemPrompt = `
-        You are an expert systems architect. Analyze the provided architecture/workflow diagram.
-        1. Give a concise explanation of what this diagram represents.
-        2. Provide 2-3 professional suggestions for improvement, edge cases to handle, or logical next steps.
-        Format your response in clean Markdown.
-      `;
-    } else {
-      systemPrompt = `
+    const systemPrompt = `
         You are an expert diagram generator. The user wants to auto-complete their current diagram.
         Attached is an image of the current diagram, and here is the JSON of existing shapes for coordinate context:
         ${JSON.stringify(existingShapes)}
@@ -63,8 +51,6 @@ export async function POST(req: Request) {
               "type": "geo", 
               "geo": "rectangle" | "diamond", 
               "text": "Label", 
-              "x": number, 
-              "y": number, 
               "w": 150, 
               "h": 80, 
               "color": "green" | "orange" | "red"
@@ -74,25 +60,27 @@ export async function POST(req: Request) {
             { "fromId": "existing_id_or_new_id", "toId": "existing_id_or_new_id" }
           ]
         }
+        CRITICAL DIMENSION RULES:
+      - You MUST calculate 'w' (width) dynamically based on the length of the 'text' property.
+      - Use this heuristic for width: w = (character count of text * 10) + 50. 
+      - Ensure the minimum 'w' is never less than 120.
+      - Default 'h' (height) to 80. If the text is longer than 25 characters, increase 'h' to 120 to allow for text wrapping.
+      
+      Do not include x or y coordinates. Do not use markdown backticks.
       `;
-    }
 
     const result = await model.generateContent([systemPrompt, imagePart]);
     const responseText = result.response.text();
 
-    if (action === "explain") {
-      return NextResponse.json({ explanation: responseText });
-    } else {
-      const cleanJsonText = responseText
-        .replace(/```json/g, "")
-        .replace(/```/g, "")
-        .trim();
-      return NextResponse.json(JSON.parse(cleanJsonText));
-    }
+    const cleanJsonText = responseText
+      .replace(/```json/g, "")
+      .replace(/```/g, "")
+      .trim();
+    return NextResponse.json(JSON.parse(cleanJsonText));
   } catch (error) {
     console.error("Gemini API Error:", error);
     return NextResponse.json(
-      { error: "Failed to analyze diagram" },
+      { error: "Failed to complete diagram" },
       { status: 500 },
     );
   }

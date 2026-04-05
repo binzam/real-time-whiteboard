@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { Editor, createShapeId, toRichText, TLShapeId } from "tldraw";
+import dagre from "dagre";
 
 export type ActionState = "idle" | "explaining" | "completing" | "generating";
 export interface AlertState {
@@ -83,11 +84,10 @@ export function useDiagramAI(editor: Editor | null) {
 
     setActionState("explaining");
     try {
-      const res = await fetch("/api/analyze-diagram", {
+      const res = await fetch("/api/explain-diagram", {
         method: "POST",
         body: JSON.stringify({
           image: context.base64Image,
-          action: "explain",
           existingShapes: context.existingShapes,
         }),
       });
@@ -120,16 +120,18 @@ export function useDiagramAI(editor: Editor | null) {
 
     setActionState("completing");
     try {
-      const res = await fetch("/api/analyze-diagram", {
+      const res = await fetch("/api/complete-diagram", {
         method: "POST",
         body: JSON.stringify({
           image: context.base64Image,
-          action: "autocomplete",
           existingShapes: context.existingShapes,
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      if (!res.ok)
+        throw new Error(
+          data.error || "Something Went Wrong. Please Try Again.",
+        );
 
       await renderDiagramData(data, editor, null);
       triggerAlert({
@@ -151,7 +153,10 @@ export function useDiagramAI(editor: Editor | null) {
     }
   };
 
-  const generateFromPrompt = async (prompt: string) => {
+  const generateFromPrompt = async (
+    prompt: string,
+    layoutDir: "TB" | "LR" = "TB",
+  ) => {
     if (!editor || !prompt.trim()) return;
     setActionState("generating");
     const center = editor.getViewportPageBounds().center;
@@ -162,7 +167,12 @@ export function useDiagramAI(editor: Editor | null) {
         body: JSON.stringify({ prompt }),
       });
       const data = await res.json();
-      await renderDiagramData(data, editor, center);
+      if (!res.ok)
+        throw new Error(
+          data.error || "Something Went Wrong. Please Try Again.",
+        );
+
+      await renderDiagramData(data, editor, center, layoutDir);
       triggerAlert({
         title: "Success",
         message: "Diagram generated successfully",
@@ -186,20 +196,33 @@ export function useDiagramAI(editor: Editor | null) {
     data: DiagramData,
     ed: Editor,
     center: { x: number; y: number } | null,
+    direction: "TB" | "LR" = "TB",
   ) {
     const idMap = new Map<string, TLShapeId>();
     const toSelect: TLShapeId[] = [];
+
+    const g = new dagre.graphlib.Graph();
+    g.setGraph({ rankdir: direction, nodesep: 100, ranksep: 100 });
+    g.setDefaultEdgeLabel(() => ({}));
+
+    for (const s of data.shapes) {
+      g.setNode(s.id, { width: s.w || 150, height: s.h || 80 });
+    }
+    for (const a of data.arrows) {
+      g.setEdge(a.fromId, a.toId);
+    }
+    dagre.layout(g);
 
     for (const s of data.shapes) {
       const newId = createShapeId();
       idMap.set(s.id, newId);
       toSelect.push(newId);
-
+      const nodeParams = g.node(s.id);
       ed.createShape({
         id: newId,
         type: "geo",
-        x: (center?.x ?? 0) + s.x,
-        y: (center?.y ?? 0) + s.y,
+        x: (center?.x ?? 0) + nodeParams.x - s.w / 2,
+        y: (center?.y ?? 0) + nodeParams.y - s.h / 2,
         props: {
           geo: s.geo,
           w: s.w,
@@ -209,7 +232,6 @@ export function useDiagramAI(editor: Editor | null) {
           fill: "semi",
         },
       });
-      await new Promise((r) => setTimeout(r, 100));
     }
 
     for (const a of data.arrows) {

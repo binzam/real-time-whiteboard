@@ -15,13 +15,21 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 interface AIToolbarProps {
   actionState: ActionState;
   disabled: boolean;
   explanation: string | null;
   setExplanation: (explanation: string | null) => void;
-  onGenerate: (prompt: string) => Promise<void>;
+  onGenerate: (prompt: string, layout: "TB" | "LR") => Promise<void>;
   onExplain: () => void;
   onAutocomplete: () => void;
 }
@@ -36,13 +44,14 @@ export function AIToolbar({
 }: AIToolbarProps) {
   const [prompt, setPrompt] = useState("");
   const [popoverOpen, setPopoverOpen] = useState(false);
+  const [layout, setLayout] = useState<"TB" | "LR">("TB");
   const isBusy = actionState !== "idle";
 
   const handleGenerate = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!prompt.trim() || disabled || isBusy) return;
 
-    await onGenerate(prompt);
+    await onGenerate(prompt, layout);
     setPrompt("");
     setPopoverOpen(false);
   };
@@ -71,7 +80,7 @@ export function AIToolbar({
           side="right"
           align="center"
           sideOffset={20}
-          className="w-80 p-4 shadow-2xl rounded-2xl border-gray-100 z-50"
+          className="w-80 p-4 shadow-2xl rounded-2xl border-gray-100 z-5001"
         >
           <div className="space-y-4">
             <div className="space-y-2">
@@ -87,22 +96,54 @@ export function AIToolbar({
                   disabled={disabled || isBusy}
                   className="h-9 focus-visible:ring-[#285a48] resize-none"
                 />
-                <Button
-                  type="submit"
-                  size={"lg"}
-                  disabled={disabled || isBusy || !prompt.trim()}
-                  className=" bg-[#285a48] text-white  hover:bg-[#091413] shrink-0"
-                >
-                  {actionState === "generating" ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" /> Generating..
-                    </>
-                  ) : (
-                    <>
-                      <Send className="h-4 w-4" /> Generate
-                    </>
-                  )}
-                </Button>
+                <div className="flex items-center gap-2">
+                  <div className="flex flex-col items-center gap-1.5">
+                    <Label
+                      htmlFor="layout-direction"
+                      className="text-[10px] uppercase tracking-wider text-gray-500 font-bold"
+                    >
+                      Diagram Direction
+                    </Label>
+
+                    <Select
+                      value={layout}
+                      disabled={disabled || isBusy}
+                      onValueChange={(val: "TB" | "LR") => setLayout(val)}
+                    >
+                      <SelectTrigger
+                        id="layout-direction"
+                        className=" h-9 w-[130px]  text-xs"
+                      >
+                        <SelectValue placeholder="Layout" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white z-5002">
+                        <SelectItem value="TB" className="text-xs">
+                          Top to Bottom
+                        </SelectItem>
+                        <SelectItem className="text-xs" value="LR">
+                          Left to Right
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    type="submit"
+                    size={"lg"}
+                    disabled={disabled || isBusy || !prompt.trim()}
+                    className=" bg-[#285a48] text-white  hover:bg-[#091413] flex-1 h-13"
+                  >
+                    {actionState === "generating" ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />{" "}
+                        Generating..
+                      </>
+                    ) : (
+                      <>
+                        <Send className="h-4 w-4" /> Generate
+                      </>
+                    )}
+                  </Button>
+                </div>
               </form>
             </div>
 
@@ -149,7 +190,7 @@ export function AIToolbar({
       </Popover>
 
       {(explanation || actionState === "explaining") && (
-        <Card className="fixed top-24 right-8 w-96 shadow-2xl border-gray-100 z-50 flex flex-col max-h-[70vh]">
+        <Card className="fixed top-24 right-8 w-96 shadow-2xl border-gray-100 z-5000 flex flex-col max-h-[70vh]">
           <CardHeader className="flex-none flex flex-row items-center justify-between space-y-0 pb-3 border-b">
             <CardTitle className="text-lg font-bold text-[#285a48]">
               AI Analysis

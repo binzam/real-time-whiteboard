@@ -25,8 +25,6 @@ export async function POST(req: Request) {
             "type": "geo", 
             "geo": "rectangle" | "diamond" | "ellipse", 
             "text": "Brief label", 
-            "x": number (relative x coordinate, space them out by ~200px), 
-            "y": number (relative y coordinate), 
             "w": 150, 
             "h": 80, 
             "color": "blue" | "light-violet" | "green" | "red" | "orange"
@@ -36,14 +34,25 @@ export async function POST(req: Request) {
           { "fromId": "id_of_source_shape", "toId": "id_of_target_shape" }
         ]
       }
+      CRITICAL DIMENSION RULES:
+      - You MUST calculate 'w' (width) dynamically based on the length of the 'text' property.
+      - Use this heuristic for width: w = (character count of text * 10) + 50. 
+      - Ensure the minimum 'w' is never less than 120.
+      - Default 'h' (height) to 80. If the text is longer than 25 characters, increase 'h' to 120 to allow for text wrapping.
+      
+      Do not include x or y coordinates. Do not use markdown backticks.
     `;
 
     const result = await model.generateContent([systemPrompt, prompt]);
     const responseText = result.response.text();
-    
-    return NextResponse.json(JSON.parse(responseText));
+    const cleanedText = responseText.replace(/```json\n?|```/g, "").trim();
+
+    return NextResponse.json(JSON.parse(cleanedText));
   } catch (error) {
     console.error("Gemini API Error:", error);
-    return NextResponse.json({ error: "Failed to generate diagram" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to generate diagram" },
+      { status: 500 },
+    );
   }
 }
