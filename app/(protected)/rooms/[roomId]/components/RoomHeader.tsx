@@ -8,6 +8,7 @@ import ActiveUsers from "./ActiveUsers";
 import Link from "next/link";
 import { memo } from "react";
 import { ChevronLeft, Moon, Sun } from "lucide-react";
+import { TemplateSelector } from "./TemplateSelector";
 
 const DarkModeButton = track(({ editor }: { editor: Editor | null }) => {
   if (!editor) return null;
@@ -52,17 +53,24 @@ export const RoomHeader = memo(
           href="/rooms"
           className="cursor-pointer flex items-center gap-0.5 text-xs hover:underline"
         >
-          <ChevronLeft className="size-3" /> Leave
+          <ChevronLeft className="size-3" /> Exit
         </Link>
-        <div className="w-px h-5 bg-gray-300 mx-1" />
-        <h1 className="font-semibold text-sm text-gray-800 tracking-tight truncate max-w-37.5">
-          {roomName}
-        </h1>
-        <div className="w-px h-5 bg-gray-300 mx-1" />
+        <div className="w-px h-5 bg-[#285a48] mx-1" />
 
-        <div className="flex items-center gap-2 pl-1">
+        <TemplateSelector editor={editor} disabled={!editor} />
+        <div className="w-px h-5 bg-[#285a48] mx-1" />
+
+        <div className="flex items-center gap-2">
+          <h1
+            className="font-semibold text-sm text-[#091413] tracking-tight truncate max-w-37.5"
+            title="Room Title"
+          >
+            {roomName}
+          </h1>
+          <div className="w-px h-5 bg-[#285a48] mx-1" />
           <ActiveUsers users={activeUsers} />
           <InviteModal roomId={roomId} />
+          <div className="w-px h-5 bg-[#285a48] mx-1" />
           <DarkModeButton editor={editor} />
         </div>
       </div>

@@ -10,7 +10,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
-import { ActionState } from "../hooks/useDiagramAI";
+import { useDiagramAI } from "../hooks/useDiagramAI"; 
+import { DynamicAlert } from "@/components/ui/alert"; 
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -23,50 +24,64 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Editor } from "tldraw"; 
 
 interface AIToolbarProps {
-  actionState: ActionState;
+  editor: Editor | null;
   disabled: boolean;
-  explanation: string | null;
-  setExplanation: (explanation: string | null) => void;
-  onGenerate: (prompt: string, layout: "TB" | "LR") => Promise<void>;
-  onExplain: () => void;
-  onAutocomplete: () => void;
 }
-export function AIToolbar({
-  actionState,
-  disabled,
-  explanation,
-  setExplanation,
-  onGenerate,
-  onExplain,
-  onAutocomplete,
-}: AIToolbarProps) {
+
+export function AIToolbar({ editor, disabled }: AIToolbarProps) {
+  const {
+    actionState,
+    explanation,
+    setExplanation,
+    explainDiagram,
+    autocompleteDiagram,
+    generateFromPrompt,
+    alertState,
+    setAlertState,
+  } = useDiagramAI(editor);
+
   const [prompt, setPrompt] = useState("");
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [layout, setLayout] = useState<"TB" | "LR">("TB");
+
   const isBusy = actionState !== "idle";
 
   const handleGenerate = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!prompt.trim() || disabled || isBusy) return;
 
-    await onGenerate(prompt, layout);
+    await generateFromPrompt(prompt, layout);
     setPrompt("");
     setPopoverOpen(false);
   };
+
   const handleExplainClick = () => {
     setPopoverOpen(false);
-    onExplain();
+    explainDiagram();
   };
+
   return (
     <>
+      {alertState && (
+        <DynamicAlert
+          variant={alertState.variant}
+          layout={alertState.layout}
+          title={alertState.title}
+          message={alertState.message}
+          onClose={() => setAlertState(null)}
+          className="z-2000"
+        />
+      )}
+
       <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
         <PopoverTrigger asChild>
           <Button
             disabled={disabled}
             size="icon"
-            className="fixed left-6 top-1/2 -translate-y-1/2 z-5000 h-14 w-14 rounded-full shadow-2xl bg-[#285a48] hover:bg-[#408a71]"
+            className="fixed left-6 top-1/2 -translate-y-1/2 active:-translate-y-1/2 z-5000 h-14 w-14 rounded-full shadow-2xl bg-[#285a48] hover:bg-[#408a71]"
           >
             {isBusy ? (
               <Loader2 className="h-6 w-6 animate-spin text-white" />
@@ -94,7 +109,7 @@ export function AIToolbar({
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   disabled={disabled || isBusy}
-                  className="h-9 focus-visible:ring-[#285a48] resize-none"
+                  className="h-9 focus-visible:ring-[#285a48] resize-none focus-visible:border-0"
                 />
                 <div className="flex items-center gap-2">
                   <div className="flex flex-col items-center gap-1.5">
@@ -130,7 +145,7 @@ export function AIToolbar({
                     type="submit"
                     size={"lg"}
                     disabled={disabled || isBusy || !prompt.trim()}
-                    className=" bg-[#285a48] text-white  hover:bg-[#091413] flex-1 h-13"
+                    className=" bg-[#285a48] text-white hover:bg-[#091413] flex-1 h-13"
                   >
                     {actionState === "generating" ? (
                       <>
@@ -170,9 +185,7 @@ export function AIToolbar({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => {
-                    onAutocomplete();
-                  }}
+                  onClick={() => autocompleteDiagram()}
                   disabled={disabled || isBusy}
                   className="w-full text-xs font-medium text-[#091413] hover:bg-slate-50"
                 >
@@ -213,7 +226,7 @@ export function AIToolbar({
                   <Skeleton className="h-4 w-[95%] bg-gray-200" />
                   <Skeleton className="h-4 w-[80%] bg-gray-200" />
                   <Skeleton className="h-4 w-[85%] bg-gray-200" />
-                  <Skeleton className="h-4 w-[92%]  bg-gray-200" />
+                  <Skeleton className="h-4 w-[92%] bg-gray-200" />
                   <Skeleton className="h-4 w-[88%] bg-gray-200" />
                   <Skeleton className="h-10 w-full bg-[#285a48]/20 mt-10" />
                   <Skeleton className="h-4 w-[90%] bg-gray-200" />
