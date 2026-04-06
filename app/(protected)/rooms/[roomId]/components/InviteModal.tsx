@@ -5,13 +5,12 @@ import {
   getInvitableUsers,
   inviteUserToRoom,
 } from "@/app/(protected)/rooms/actions/room-actions";
+
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Loader2, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -48,26 +47,28 @@ export default function InviteModal({ roomId }: { roomId: string }) {
     }
   };
   return (
-    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>
+    <Popover open={isOpen} onOpenChange={handleOpenChange}>
+      <PopoverTrigger asChild>
         <Button
           variant="secondary"
           size="sm"
           className="rounded-full h-8 gap-1.5 text-xs font-semibold"
         >
           <UserPlus className="size-3.5" />
-          Share
+          Invite
         </Button>
-      </DialogTrigger>
+      </PopoverTrigger>
 
-      <DialogContent className="sm:max-w-md rounded-2xl">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-bold tracking-tight">
-            Invite Collaborators
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="mt-4">
+      <PopoverContent
+        side="bottom"
+        align="center"
+        sideOffset={20}
+        className="w-100 p-4 shadow-2xl rounded-2xl border-gray-100 z-5001"
+      >
+        <div className="text-sm font-semibold text-[#091413]">
+          Invite Collaborators
+        </div>
+        <div className="mt-2">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-10 gap-2">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -80,7 +81,7 @@ export default function InviteModal({ roomId }: { roomId: string }) {
               </p>
             </div>
           ) : (
-            <ScrollArea className="h-60 pr-4">
+            <ScrollArea className="max-h-60 pr-4">
               <div className="space-y-3">
                 {users.map((u) => (
                   <div
@@ -107,7 +108,7 @@ export default function InviteModal({ roomId }: { roomId: string }) {
             </ScrollArea>
           )}
         </div>
-      </DialogContent>
-    </Dialog>
+      </PopoverContent>
+    </Popover>
   );
 }

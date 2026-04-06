@@ -132,8 +132,55 @@ export function useDiagramAI(editor: Editor | null) {
         throw new Error(
           data.error || "Something Went Wrong. Please Try Again.",
         );
+      let targetCenter = null;
+      if (data.arrows && data.arrows.length > 0) {
+        for (const arrow of data.arrows) {
+          // AI might attach fromId to the existing shape, or toId
+          let connectedShape = editor.getShape(arrow.fromId as TLShapeId);
+          if (!connectedShape) {
+            connectedShape = editor.getShape(arrow.toId as TLShapeId);
+          }
 
-      await renderDiagramData(data, editor, null);
+          if (connectedShape) {
+            const bounds = editor.getShapePageBounds(connectedShape);
+            if (bounds) {
+              targetCenter = {
+                x: bounds.center.x, // Align horizontally with the parent node
+                y: bounds.maxY + 120, // Add 120px padding below the parent node
+              };
+              break;
+            }
+          }
+        }
+      }
+
+      // 2. Fallback: If no connection found, place below the bounding box of ALL existing shapes
+      if (!targetCenter) {
+        const existingShapeIds = Array.from(editor.getCurrentPageShapeIds());
+        if (existingShapeIds.length > 0) {
+          let minX = Infinity,
+            maxX = -Infinity,
+            maxY = -Infinity;
+
+          existingShapeIds.forEach((id) => {
+            const bounds = editor.getShapePageBounds(id);
+            if (bounds) {
+              minX = Math.min(minX, bounds.minX);
+              maxX = Math.max(maxX, bounds.maxX);
+              maxY = Math.max(maxY, bounds.maxY);
+            }
+          });
+
+          targetCenter = {
+            x: minX + (maxX - minX) / 2, // Center of the whole diagram
+            y: maxY + 150, // Safely below everything
+          };
+        } else {
+          // Last resort fallback
+          targetCenter = editor.getViewportPageBounds().center;
+        }
+      }
+      await renderDiagramData(data, editor, targetCenter);
       triggerAlert({
         title: "Success",
         message: "Diagram auto-completed successfully.",
@@ -212,17 +259,28 @@ export function useDiagramAI(editor: Editor | null) {
       g.setEdge(a.fromId, a.toId);
     }
     dagre.layout(g);
+    const graphWidth = g.graph().width ?? 0;
+    const graphHeight = g.graph().height ?? 0;
+
+    const baseX = center?.x ?? 0;
+    const baseY = center?.y ?? 0;
 
     for (const s of data.shapes) {
       const newId = createShapeId();
       idMap.set(s.id, newId);
       toSelect.push(newId);
       const nodeParams = g.node(s.id);
+      const finalX = baseX + nodeParams.x - s.w / 2 - graphWidth / 2;
+
+      const finalY =
+        direction === "LR"
+          ? baseY + nodeParams.y - s.h / 2 - graphHeight / 2
+          : baseY + nodeParams.y - s.h / 2;
       ed.createShape({
         id: newId,
         type: "geo",
-        x: (center?.x ?? 0) + nodeParams.x - s.w / 2,
-        y: (center?.y ?? 0) + nodeParams.y - s.h / 2,
+        x: finalX,
+        y: finalY,
         props: {
           geo: s.geo,
           w: s.w,

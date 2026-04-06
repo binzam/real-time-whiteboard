@@ -5,10 +5,10 @@ import "tldraw/tldraw.css";
 import { Editor, Tldraw, TLUiToolsContextType } from "tldraw";
 import { useCallback, useState } from "react";
 import { RoomHeader } from "./RoomHeader";
-import { useDiagramAI } from "../hooks/useDiagramAI";
 import LoadingSpinner from "./LoadingSpinner";
-import { DynamicAlert } from "@/components/ui/alert";
 import { AIToolbar } from "./AIToolbar";
+import { Button } from "@/components/ui/button";
+import { TemplateSelector } from "./TemplateSelector";
 
 const uiOverrides = {
   tools: (_editor: Editor, tools: TLUiToolsContextType) => {
@@ -27,16 +27,7 @@ export default function RoomClient({
   user: { id: string; name: string; color: string };
 }) {
   const [editor, setEditor] = useState<Editor | null>(null);
-  const {
-    actionState,
-    explanation,
-    setExplanation,
-    explainDiagram,
-    autocompleteDiagram,
-    generateFromPrompt,
-    alertState,
-    setAlertState,
-  } = useDiagramAI(editor);
+  const [showStylePanel, setShowStylePanel] = useState(false);
 
   const { storeWithStatus, activeUsers } = useYjsStore({
     roomId,
@@ -55,6 +46,11 @@ export default function RoomClient({
       mountedEditor.registerExternalContentHandler("file-replace", () => {});
       mountedEditor.registerExternalContentHandler("url", () => {});
       mountedEditor.registerExternalContentHandler("svg-text", () => {});
+
+      setTimeout(() => {
+        mountedEditor.zoomToFit({ animation: { duration: 0 } });
+      }, 50);
+
       setEditor(mountedEditor);
     },
     [user],
@@ -78,30 +74,22 @@ export default function RoomClient({
         roomId={roomId}
         editor={editor}
       />
-      {alertState && (
-        <DynamicAlert
-          variant={alertState.variant}
-          layout={alertState.layout}
-          title={alertState.title}
-          message={alertState.message}
-          onClose={() => setAlertState(null)}
-          className="z-2000"
-        />
-      )}
-      <AIToolbar
-        actionState={actionState}
-        disabled={!editor}
-        explanation={explanation}
-        setExplanation={setExplanation}
-        onGenerate={generateFromPrompt}
-        onExplain={explainDiagram}
-        onAutocomplete={autocompleteDiagram}
-      />
+
+      <Button
+        type="button"
+        onClick={() => setShowStylePanel((prev) => !prev)}
+        className="absolute top-2 right-40 z-2000 rounded-md bg-white px-3 py-1.5 text-xs font-medium shadow-md border border-gray-200 text-[#091413] hover:bg-gray-50 transition-colors"
+      >
+        {showStylePanel ? "Hide" : "Show Styles Panel"}
+      </Button>
+
+      <AIToolbar editor={editor} disabled={!editor} />
       <div className="absolute inset-0 z-0">
         <Tldraw
           store={storeWithStatus.store}
           onMount={handleMount}
           overrides={uiOverrides}
+          components={showStylePanel ? undefined : { StylePanel: () => null }}
         />
       </div>
     </div>
